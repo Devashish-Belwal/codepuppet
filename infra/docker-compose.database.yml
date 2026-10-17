@@ -1,0 +1,25 @@
+name: code-puppet
+
+services:
+  db:
+    platform: linux/amd64
+    image: postgres:15 # Use a specific version of Postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=local
+      - POSTGRES_PASSWORD=local_123
+      - POSTGRES_DB=codepuppet
+    ports:
+      - '5432:5432' # Expose the Postgres port to your local machine
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U local -d codepuppet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+ 
+
+volumes:
+  postgres_data:
+    driver: local

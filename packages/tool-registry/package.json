@@ -1,0 +1,20 @@
+{
+    "name": "@workspace/tool-registry",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "scripts": {
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "fast-glob": "^3.3.3",
+        "zod": "^4.4.3",
+        "@workspace/protocol": "*"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.24"
+    }
+}
