@@ -10,7 +10,7 @@ services:
       - POSTGRES_PASSWORD=local_123
       - POSTGRES_DB=codepuppet
     ports:
-      - '5432:5432' # Expose the Postgres port to your local machine
+      - '5433:5432' # Expose the Postgres port to your local machine (5433 to avoid conflict with local PG)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U local -d codepuppet"]
       interval: 5s
