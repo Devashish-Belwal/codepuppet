@@ -4,12 +4,14 @@ const PROVIDER_LABELS: Record<string, string> = {
     openai: "OpenAI",
     anthropic: "Anthropic",
     google: "Google",
+    openrouter: "OpenRouter",
 }
 
 const PROVIDER_TONE: Record<string, string> = {
     anthropic: "bg-primary/12 text-primary border-primary/25",
     openai: "bg-teal/15 text-foreground border-teal/40",
     google: "bg-amber/18 text-foreground border-amber/45",
+    openrouter: "bg-purple-500/15 text-foreground border-purple-500/40",
 }
 
 const DEFAULT_PROVIDER_TONE = "bg-muted text-muted-foreground border-border"

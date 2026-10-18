@@ -70,7 +70,7 @@ async function runTurn(params: ProviderTurnCall): Promise<void> {
     // local variables that collect the stream as it comes in - nothing is written
     // to the database until the stream is fully finished
     let textBuffer = "";
-    const toolCalls: { id: string; name: string; arguments: Record<string, unknown> }[] = [];
+    const toolCalls: ProviderToolCall[] = [];
     let usageInfo: { inputTokens: number; outputTokens: number; cachedTokens: number; reasoningTokens?: number } | undefined;
     let errorInfo: { code: string; message: string } | undefined;
     let stopReason: StopReason | undefined;
@@ -98,7 +98,12 @@ async function runTurn(params: ProviderTurnCall): Promise<void> {
             if (event.type === "text_delta") {
                 textBuffer += event.text;
             } else if (event.type === "tool_call") {
-                toolCalls.push({ id: event.id, name: event.name, arguments: event.arguments });
+                toolCalls.push({
+                    id: event.id,
+                    name: event.name,
+                    arguments: event.arguments,
+                    providerMetadata: event.providerMetadata,
+                });
             } else if (event.type === "usage") {
                 usageInfo = event;
             } else if (event.type === "error") {

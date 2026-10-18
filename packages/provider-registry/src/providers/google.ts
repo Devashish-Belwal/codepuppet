@@ -37,12 +37,19 @@ export class GoogleProvider implements ProviderAdapter {
         let toolCallNumber = 0
         let hasToolCalls = false
 
+        let lastThoughtSignature: string | undefined
+
         for await (const chunk of stream) {
             responseId = chunk.responseId ?? responseId
             usage = chunk.usageMetadata ?? usage
             finishReason = chunk.candidates?.[0]?.finishReason ?? finishReason
             for (const candidate of chunk.candidates ?? []) {
                 for (const part of candidate.content?.parts ?? []) {
+                    const sig = (part as any).thoughtSignature ?? (part as any).thought_signature
+                    if (sig) {
+                        lastThoughtSignature = sig
+                    }
+
                     if (part.text && part.thought) {
                         yield { type: "reasoning_delta", text: part.text }
                     } else if (part.text) {
@@ -54,6 +61,8 @@ export class GoogleProvider implements ProviderAdapter {
                         const id = part.functionCall.id ?? `google-tool-${responseId ?? "response"}-${toolCallNumber}`
                         toolCallNumber += 1;
 
+                        const thoughtSig = sig ?? lastThoughtSignature
+
                         yield {
                             type: "tool_call",
                             id,
@@ -61,7 +70,7 @@ export class GoogleProvider implements ProviderAdapter {
                             arguments: part.functionCall.args ?? {},
                             providerMetadata: {
                                 google: {
-                                    thoughtSignature: part.thoughtSignature
+                                    thoughtSignature: thoughtSig
                                 }
                             }
                         }
@@ -125,14 +134,20 @@ function toGoogleContents(request: ProviderStreamRequest): Content[] {
                 parts.push({ text: message.content })
             }
             for (const toolCall of message.toolCalls ?? []) {
-                parts.push({
+                const thoughtSig = (toolCall.providerMetadata?.google as { thoughtSignature?: string; thought_signature?: string } | undefined)?.thoughtSignature
+                    ?? (toolCall.providerMetadata?.google as { thoughtSignature?: string; thought_signature?: string } | undefined)?.thought_signature;
+
+                const partObj: Record<string, unknown> = {
                     functionCall: {
                         id: toolCall.id,
                         name: toolCall.name,
                         args: toolCall.arguments,
                     },
-                    thoughtSignature: (toolCall.providerMetadata?.google as { thoughtSignature?: string } | undefined)?.thoughtSignature
-                })
+                };
+                if (thoughtSig) {
+                    partObj.thoughtSignature = thoughtSig;
+                }
+                parts.push(partObj as any);
             }
             contents.push({ role: "model", parts })
         }

@@ -12,7 +12,8 @@
     "clean": "turbo run clean",
     "lint": "turbo lint",
     "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "cli": "bun run --cwd apps/cli dev --"
   },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",

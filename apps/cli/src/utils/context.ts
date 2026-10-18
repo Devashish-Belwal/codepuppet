@@ -10,7 +10,8 @@ export const ENV_CONFIG = {
 }
 
 export function resolveApiUrl(): string {
-    return (ENV_CONFIG.CODE_PUPPET_API_URL).replace(/\/$/, "")
+    const raw = (ENV_CONFIG.CODE_PUPPET_API_URL).replace(/\/$/, "");
+    return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`;
 }
 
 export const apiUrl = resolveApiUrl();

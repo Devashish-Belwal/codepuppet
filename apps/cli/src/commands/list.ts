@@ -75,6 +75,14 @@ async function listModels(requestedProvider?: string): Promise<void> {
 }
 
 async function loadCatalogProviders(): Promise<CatalogProvider[]> {
+    try {
+        const live = await harness.api.listProviders();
+        if (live && live.length > 0) {
+            await harness.catalog.set({ schemaVersion: 1, fetchedAt: new Date().toISOString(), providers: live });
+            return live;
+        }
+    } catch { }
+
     const catalog = await harness.catalog.get();
     if (!catalog) {
         throw new CliUsageError("No provider catalog is cached. Run 'code-puppet init' first.");
