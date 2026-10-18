@@ -345,7 +345,7 @@ export const openrouterModelCatalogSeed: SeedModel[] = [
         enabled: true,
         isDefault: false,
     },
-] as const;
+];
 
 export const providers: SeedProvider[] = [
     {
@@ -378,7 +378,7 @@ export const providers: SeedProvider[] = [
         description: "Unified API for 300+ AI models including Claude, DeepSeek, Llama, and GPT",
         documentationUrl: "https://openrouter.ai/docs",
         isDefault: false,
-        models: openrouterModelCatalogSeed as any
+        models: openrouterModelCatalogSeed
     },
 ] as const
 

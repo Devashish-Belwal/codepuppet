@@ -1,32 +1,24 @@
-name: Validate, Publish Docker Images and Deploy the Backend to EC2
+name: CI/CD Pipeline
 
 on:
   pull_request:
     branches:
       - main
-
   push:
     branches:
       - main
-
   workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  REGISTRY: docker.io
-  IMAGE_NAME: codepuppet-backend
-  IMAGE_TAG: ${{ github.sha }}
-  DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
-
 jobs:
   validate:
+    name: Lint, Typecheck & Build
     runs-on: ubuntu-latest
-    # prisma generate only needs DATABASE_URL to be present, not a real connection -
-    # mirrors the placeholder used in infra/docker/backend/dockerfile.
     env:
       DATABASE_URL: postgresql://build:build@localhost:5432/build
+      NEXT_PUBLIC_API_HOST: https://codepuppet.dabelwal.online
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,6 +31,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Generate Prisma Client
+        run: bun run --cwd packages/database generate
+
       - name: Run lint
         run: bun run lint
 
@@ -48,69 +43,43 @@ jobs:
       - name: Build workspace
         run: bun run build
 
-  publish-image:
-    name: Publish the backend image to docker
-    needs: validate
-    runs-on: ubuntu-latest
-
-    # Do not push Docker images from pull requests.
-    if: github.event_name != 'pull_request'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: infra/docker/backend/dockerfile
-          push: true
-          tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          cache-from: type=gha,scope=${{ env.IMAGE_NAME }}
-          cache-to: type=gha,mode=max,scope=${{ env.IMAGE_NAME }}
-
   deploy:
     name: Deploy to EC2
-    needs: publish-image
+    needs: validate
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Copy compose file to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: infra/docker-compose.prod.yml
-          target: opt/code-puppet
-          overwrite: true
-
-      - name: Pull latest images and restart stack
+      - name: Deploy on EC2 via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
           script: |
             set -e
-            cd opt/code-puppet
-            docker compose -f infra/docker-compose.prod.yml --env-file .env pull
-            docker compose -f infra/docker-compose.prod.yml --env-file .env up -d --remove-orphans
-            docker image prune -af --filter "until=24h"
+            export PATH="$HOME/.bun/bin:$PATH"
+            cd ~/codepuppet
+
+            echo "==> Fetching latest changes from main..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "==> Installing dependencies..."
+            bun install
+
+            echo "==> Generating Prisma client..."
+            bun run --cwd packages/database generate
+
+            echo "==> Running database migrations..."
+            bun run db:migrate:deploy
+
+            echo "==> Building production application..."
+            bun run build
+
+            echo "==> Reloading PM2 services..."
+            pm2 reload ecosystem.config.cjs --update-env || pm2 restart ecosystem.config.cjs || pm2 start ecosystem.config.cjs
+            pm2 save
+
+            echo "==> Deployment finished successfully!"
